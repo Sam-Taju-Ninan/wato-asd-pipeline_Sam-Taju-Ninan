@@ -11,6 +11,7 @@ nav_msgs::msg::Path PlannerCore::planPath(
         const geometry_msgs::msg::PointStamped& goal_point){
 
         nav_msgs::msg::Path path;
+        path.header.frame_id = "sim_world";
 
         //Remember, we have to convert start and end into grid cells
         double res      = map.info.resolution;
@@ -63,6 +64,7 @@ nav_msgs::msg::Path PlannerCore::planPath(
                 CellIndex step = goal;
                 while (step != start) {
                     geometry_msgs::msg::PoseStamped pose;
+                    pose.header.frame_id = "sim_world";
                     // Convert grid cell back to world coordinates
                     pose.pose.position.x = origin_x + (step.x + 0.5) * res;
                     pose.pose.position.y = origin_y + (step.y + 0.5) * res;
@@ -101,8 +103,8 @@ nav_msgs::msg::Path PlannerCore::planPath(
                 //anything over 50 is too dangerous. 
                 int flat_index = neighbor.y * width + neighbor.x;
 
-                if (map.data[flat_index] > 25) { 
-                    continue; // Skip it
+                if (map.data[flat_index] > 50) {
+                    continue; 
                 }
 
                 //Calculate the cost to reach this neighbor. Moving one square costs 1.
@@ -134,6 +136,7 @@ nav_msgs::msg::Path PlannerCore::planPath(
             }
 
         }
+        RCLCPP_WARN(logger_, "A* failed to find a path! stuck in a wall?");
         return path;
 
     }

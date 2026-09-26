@@ -8,7 +8,10 @@ ControlNode::ControlNode()
 
     //path sub is like the map reader
     path_sub_ = this->create_subscription<nav_msgs::msg::Path>(
-        "/path", 10, [this](const nav_msgs::msg::Path::SharedPtr msg) { current_path_ = msg; });
+        "/path", 10, [this](const nav_msgs::msg::Path::SharedPtr msg) { 
+            current_path_ = msg; 
+            control_.current_path_index_ = 0;
+        });
 
     //odom is the GPS receiver kinda
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(

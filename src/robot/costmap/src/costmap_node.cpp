@@ -37,7 +37,7 @@ void CostmapNode::laserCallback(const sensor_msgs::msg::LaserScan::SharedPtr sca
 
   //Step 4 it gets published
   grid.header.stamp    = this->get_clock()->now();
-  grid.header.frame_id = "odom";
+  grid.header.frame_id = "sim_world";
   costmap_pub_->publish(grid);
 }
 

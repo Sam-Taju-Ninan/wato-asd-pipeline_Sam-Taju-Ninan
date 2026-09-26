@@ -81,7 +81,7 @@ void PlannerNode::planPath(){
   nav_msgs::msg::Path path = planner_.planPath(current_map_, robot_pose_, goal_);
 
   path.header.stamp    = this->get_clock()->now();
-  path.header.frame_id = "odom";
+  path.header.frame_id = "sim_world";
 
   //Publish the resulting path to /path topic
   path_pub_->publish(path);

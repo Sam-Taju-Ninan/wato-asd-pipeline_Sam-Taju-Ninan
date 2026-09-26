@@ -5,13 +5,24 @@ namespace robot {
 
 // Constructor — no need to set parameters again, already set in header
 ControlCore::ControlCore(const rclcpp::Logger& logger) 
-  : logger_(logger) {}
+  : logger_(logger) {
+    linear_speed_ = 1.5;
+    lookahead_distance_ = 1.0;
+    goal_tolerance_ = 0.5;
+  }
 
 geometry_msgs::msg::Twist ControlCore::computeCommand(
     const nav_msgs::msg::Path::SharedPtr& path,
     const nav_msgs::msg::Odometry::SharedPtr& odom) {
 
   geometry_msgs::msg::Twist cmd_vel;
+
+  // 1. SAFETY STOP:
+    if (path->poses.empty() || current_path_index_ >= path->poses.size()) {
+        cmd_vel.linear.x = 0.0;
+        cmd_vel.angular.z = 0.0;
+        return cmd_vel; // Instantly return the zeroed speeds
+    }
 
   // Extract robot position and heading
   auto robot_pos  = odom->pose.pose.position;
@@ -48,27 +59,55 @@ geometry_msgs::msg::Twist ControlCore::computeCommand(
   while (alpha >  M_PI) alpha -= 2.0 * M_PI;
   while (alpha < -M_PI) alpha += 2.0 * M_PI;
 
-  // Pure Pursuit steering formula
-  cmd_vel.linear.x  = linear_speed_;
-  cmd_vel.angular.z = (2.0 * linear_speed_ * std::sin(alpha)) / lookahead_distance_;
+  // TURN-IN-PLACE THRESHOLD
+  double k_theta = 1.5; // Steering sensitivity
+
+  if (std::abs(alpha) > 0.6) {
+      // If the turn is sharp (> ~35 degrees), stop forward movement and ONLY spin
+      cmd_vel.linear.x = 0.0;
+      cmd_vel.angular.z = k_theta * alpha;
+  } else {
+      // If the robot is mostly facing the right way, drive forward using Pure Pursuit
+      cmd_vel.linear.x = linear_speed_;
+      cmd_vel.angular.z = (2.0 * linear_speed_ * std::sin(alpha)) / lookahead_distance_;
+  }
+
+  // CLAMP MAXIMUM SPIN SPEED to prevent violent shaking
+  double max_spin = 1.2;
+  if (cmd_vel.angular.z > max_spin) cmd_vel.angular.z = max_spin;
+  if (cmd_vel.angular.z < -max_spin) cmd_vel.angular.z = -max_spin;
 
   return cmd_vel;
 }
 
 std::optional<geometry_msgs::msg::PoseStamped> ControlCore::findLookaheadPoint(
-    const nav_msgs::msg::Path::SharedPtr& path,
+    const nav_msgs::msg::Path::SharedPtr& path, 
     const geometry_msgs::msg::Point& robot_pos) {
-
-  // Find first waypoint further than lookahead distance
-  for (const auto& waypoint : path->poses) {
-    if (computeDistance(robot_pos, waypoint.pose.position) >= lookahead_distance_) {
-      return waypoint;
+    
+    if (path->poses.empty()) {
+        return std::nullopt;
     }
-  }
 
-  // If whole path is closer than lookahead, aim for the end
-  if (!path->poses.empty()) return path->poses.back();
-  return std::nullopt;
+    // 1. Find the index of the closest point on the path to the robot
+    size_t closest_index = 0;
+    double min_dist = std::numeric_limits<double>::max();
+    for (size_t i = 0; i < path->poses.size(); ++i) {
+        double dist = computeDistance(robot_pos, path->poses[i].pose.position);
+        if (dist < min_dist) {
+            min_dist = dist;
+            closest_index = i;
+        }
+    }
+
+    // 2. Scan forward from the closest point to find the first waypoint >= lookahead_distance_
+    for (size_t i = closest_index; i < path->poses.size(); ++i) {
+        if (computeDistance(robot_pos, path->poses[i].pose.position) >= lookahead_distance_) {
+            return path->poses[i];
+        }
+    }
+    
+    // 3. If everything ahead is within the lookahead distance, aim for the end of the path
+    return path->poses.back();
 }
 
 double ControlCore::computeDistance(

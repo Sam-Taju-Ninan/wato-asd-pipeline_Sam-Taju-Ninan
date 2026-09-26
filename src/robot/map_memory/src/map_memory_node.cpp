@@ -8,7 +8,7 @@ MapMemoryNode::MapMemoryNode()
   last_y_(0.0), //robots y position at last update
   current_x_(0.0), //robot's current x position
   current_y_(0.0), // robot's current y position
-  distance_threshold_(1.5), //how far robot must move before updating map
+  distance_threshold_(0.3), //how far robot must move before updating map (I changed it to 0.3 for debugging purposes)
   costmap_updated_(false), //has a new costmap arrived since last update
   should_update_map_(false) //has the robot moved far enough to update
 {
@@ -32,6 +32,18 @@ MapMemoryNode::MapMemoryNode()
   timer_ = this->create_wall_timer(
       std::chrono::seconds(1),
       std::bind(&MapMemoryNode::updateMap, this));
+
+
+  // Publish empty map immediately so planner has something to start with
+  global_map_.info.resolution = 0.1;
+  global_map_.info.width      = 500;
+  global_map_.info.height     = 500;
+  global_map_.info.origin.position.x = -(500 * 0.1) / 2.0;
+  global_map_.info.origin.position.y = -(500 * 0.1) / 2.0;
+  global_map_.info.origin.orientation.w = 1.0;
+  global_map_.header.frame_id = "sim_world";  // ← critical
+  global_map_.data.assign(500 * 500, -1);
+  map_pub_->publish(global_map_);
 }
 
 //Trried every time the costmap node publishes a new part of the map
@@ -64,6 +76,8 @@ void MapMemoryNode::updateMap() {
     //Only do the heavy lifting of stitching maps if we actually have new data and we moved far enough
   if (should_update_map_ && costmap_updated_) {
       map_memory_.integrateCostmap(global_map_, latest_costmap_, current_x_, current_y_);
+      global_map_.header.stamp = this->get_clock()->now();  
+      global_map_.header.frame_id = "sim_world";               
       map_pub_->publish(global_map_);
       should_update_map_ = false;
   }
