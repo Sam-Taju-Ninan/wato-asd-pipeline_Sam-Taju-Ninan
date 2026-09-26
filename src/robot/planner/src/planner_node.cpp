@@ -61,9 +61,6 @@ void PlannerNode::timerCallback(){
     if (goalReached()) {
         RCLCPP_INFO(this->get_logger(), "Goal reached!");
         state_ = State::WAITING_FOR_GOAL;
-    } else {
-        RCLCPP_INFO(this->get_logger(), "Replanning due to timeout or progress...");
-        planPath();
     }
   }
 }
