@@ -33,7 +33,7 @@ class CostmapCore {
     static constexpr double RESOLUTION     = 0.1; //Each grid cell represents 0.1 meters of real world space. 
     static constexpr int    WIDTH          = 200;   //Grid is 200cells wid so its 20m wide
     static constexpr int    HEIGHT         = 200;   //20m high
-    static constexpr double INFLATION_RADIUS = 1.0; //how far to sprea cost around each obstacle
+    static constexpr double INFLATION_RADIUS = 1.5; //how far to sprea cost around each obstacle
     static constexpr int    MAX_COST       = 100; //highest cost value
 
 };

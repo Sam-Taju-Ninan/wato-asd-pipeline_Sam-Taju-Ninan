@@ -58,16 +58,33 @@ nav_msgs::msg::Path PlannerCore::planPath(
             //Checks if we are there yet
             if (current == goal) {
                 RCLCPP_INFO(logger_, "Goal found! Reconstructing path...");
-                // (We will write the path reconstruction block here next)
-                return path; 
+                
+                // Trace came_from backwards from goal to start
+                CellIndex step = goal;
+                while (step != start) {
+                    geometry_msgs::msg::PoseStamped pose;
+                    // Convert grid cell back to world coordinates
+                    pose.pose.position.x = origin_x + (step.x + 0.5) * res;
+                    pose.pose.position.y = origin_y + (step.y + 0.5) * res;
+                    pose.pose.orientation.w = 1.0;
+                    path.poses.push_back(pose);
+                    step = came_from[step];
+                }
+                // Reverse so path goes start → goal
+                std::reverse(path.poses.begin(), path.poses.end());
+                return path;
             }
 
             //Define the 4 immediate neighbors (Right, Left, Up, Down),
             std::vector<CellIndex> neighbors = {
-                CellIndex(current.x + 1, current.y),
-                CellIndex(current.x - 1, current.y),
-                CellIndex(current.x, current.y + 1),
-                CellIndex(current.x, current.y - 1)
+                CellIndex(current.x + 1, current.y),      // right
+                CellIndex(current.x - 1, current.y),      // left
+                CellIndex(current.x, current.y + 1),      // up
+                CellIndex(current.x, current.y - 1),      // down
+                CellIndex(current.x + 1, current.y + 1),  // diagonal
+                CellIndex(current.x - 1, current.y + 1),  // diagonal
+                CellIndex(current.x + 1, current.y - 1),  // diagonal
+                CellIndex(current.x - 1, current.y - 1)   // diagonal
             };
 
             //Now, its calculating the neighbours h + g = f
@@ -84,12 +101,13 @@ nav_msgs::msg::Path PlannerCore::planPath(
                 //anything over 50 is too dangerous. 
                 int flat_index = neighbor.y * width + neighbor.x;
 
-                if (map.data[flat_index] > 50) { 
+                if (map.data[flat_index] > 25) { 
                     continue; // Skip it
                 }
 
                 //Calculate the cost to reach this neighbor. Moving one square costs 1.
-                double tentative_g_score = g_scores[current] + 1.0;
+                double move_cost = (neighbor.x != current.x && neighbor.y != current.y) ? 1.414 : 1.0;
+                double tentative_g_score = g_scores[current] + move_cost;
 
                 //If we have never visited this neighbor, OR we found a faster route to it:
 

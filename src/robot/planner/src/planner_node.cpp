@@ -83,6 +83,9 @@ void PlannerNode::planPath(){
   //Passes map, start pose, and goal into PlannerCore A* algorithm
   nav_msgs::msg::Path path = planner_.planPath(current_map_, robot_pose_, goal_);
 
+  path.header.stamp    = this->get_clock()->now();
+  path.header.frame_id = "odom";
+
   //Publish the resulting path to /path topic
   path_pub_->publish(path);
  
